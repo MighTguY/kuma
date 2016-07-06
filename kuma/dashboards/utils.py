@@ -3,6 +3,7 @@ from itertools import product
 import datetime
 import json
 
+from dateutil import parser
 from django.contrib.auth.models import Group
 from django.utils.six.moves.urllib.parse import urlparse
 from django.utils.translation import ugettext as _
@@ -249,8 +250,10 @@ def spam_dashboard_historical_stats(
 
         # Regenerate stats if change attempts with needs_review and stale
         if raw_events['needs_review']:
-            age = datetime.datetime.now() - raw_events['generated']
-            if age.total_seconds > 300:
+            generated = parser.parse(raw_events['generated'])
+
+            age = datetime.datetime.now() - generated
+            if age.total_seconds() > 300:
                 job.delete(day)
                 raw_events = job.get(day)
 
