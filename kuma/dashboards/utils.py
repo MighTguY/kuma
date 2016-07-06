@@ -433,13 +433,15 @@ def spam_dashboard_recent_events():
         else:
             has_link = False
             if rb.data:
-                data = json.loads(rb.data)
-                if data['blog_lang'].startswith('en'):
+                rb_data = json.loads(rb.data)
+                if rb_data['blog_lang'].startswith('en'):
                     change_type = 'changetype_new'
+                    url = rb_data['permalink']
+                    document_path = urlparse(url).path
                 else:
                     change_type = 'changetype_newtrans'
-                url = data['permalink']
-                document_path = urlparse(url).path
+                    lang1, lang2 = rb_data['blog_lang'].split(',')
+                    document_path = '/%s/%s' % (lang1, rb.slug)
             else:
                 document_path = '/' + rb.slug
                 change_type = 'unknown'
