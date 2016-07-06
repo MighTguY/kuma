@@ -6,9 +6,6 @@
 <style>
 
 .dashboard .kpis {
-    width: 20%;
-    margin-left: 20px;
-    margin-right: 10px;
     margin-top: 10px;
     margin-bottom: 10px;
     text-align: center;
@@ -23,6 +20,7 @@
     font-size: x-large;
     margin-bottom: 10px;
 }
+
 
 .spam-trends-table {
     border: 0;
@@ -161,16 +159,24 @@ table.spam-events-table {
                      start=summary.start, end=summary.end,
                      weeks=summary.days // 7) }}
             </p>
-            <dl class='kpis'>
-                <dt>{{ ngettext('Edit', 'Edits', summary.total) }}</dt>
-                <dd>{{ summary.total }}<dd>
-                <dt>{{ _('Spam') }}</dt>
-                <dd>{{ "%0.1f%%" | format(100 * summary.spam_rate) }}</dd>
-                <dt>{{ _('Spam Blocked') }}</dt>
-                <dd>{{ "%d%%" | format(100 * summary.spam_blocked_rate) }}</dd>
-                <dt>{{ _('False Positive Rate') }}</dt>
-                <dd>{{ "%0.1f%%" | format(100 * summary.blocked_ham_rate) }}</dd>
-            </dl>
+            <div class='kpis column-container'>
+                <dl class="column-quarter">
+                    <dt>{{ ngettext('Edit', 'Edits', summary.total) }}</dt>
+                    <dd>{{ summary.total }}<dd>
+                </dl>
+                <dl class="column-quarter">
+                    <dt>{{ _('Spam') }}</dt>
+                    <dd>{{ "%0.1f%%" | format(100 * summary.spam_rate) }}</dd>
+                </dl>
+                <dl class="column-quarter">
+                    <dt>{{ _('Spam Blocked') }}</dt>
+                    <dd>{{ "%d%%" | format(100 * summary.spam_blocked_rate) }}</dd>
+                </dl>
+                <dl class="column-quarter">
+                    <dt>{{ _('False Positive Rate') }}</dt>
+                    <dd>{{ "%0.1f%%" | format(100 * summary.blocked_ham_rate) }}</dd>
+                </dl>
+            </div>
           {% else %}
             <p>
                 {{ _('There were no edits in the past %(count)s days.', count=summary.days) }}
