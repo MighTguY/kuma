@@ -116,7 +116,7 @@ def spam_day_stats(day):
         # Is the author in a special group?
         group = 'other'
         for name, user_ids in special_groups:
-            if rev.creator_id in user_ids:
+            if blocked.user_id in user_ids:
                 group = name
                 break
 
