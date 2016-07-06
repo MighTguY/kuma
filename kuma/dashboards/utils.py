@@ -254,8 +254,7 @@ def spam_dashboard_historical_stats(
 
             age = datetime.datetime.now() - generated
             if age.total_seconds() > 300:
-                job.delete(day)
-                raw_events = job.get(day)
+                job.invalidate(day)
 
         # Create 0 records for missing raw events
         day_events = dict()
