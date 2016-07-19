@@ -5,12 +5,11 @@ import json
 
 from dateutil import parser
 from django.contrib.auth.models import Group
-from django.utils.six.moves.urllib.parse import urlparse
 from django.utils.translation import ugettext as _
 
-from kuma.core.urlresolvers import reverse
 from kuma.users.models import User
-from kuma.wiki.models import (DocumentSpamAttempt,
+from kuma.wiki.models import (DocumentDeletionLog,
+                              DocumentSpamAttempt,
                               Revision,
                               RevisionAkismetSubmission)
 from .constants import (KNOWN_AUTHORS_GROUP,
@@ -360,18 +359,19 @@ def spam_dashboard_historical_stats(
     return data
 
 
-def spam_dashboard_recent_events():
+def spam_dashboard_recent_events(start_date=None):
     """Gather data for recent spam events."""
     data = {
         'now': datetime.datetime.now().isoformat(),
         'recent_spam': [],
-        'recent_blocked': [],
     }
+    if not start_date:
+        start_date = datetime.datetime.now() - datetime.timedelta(days=181)
 
     # Gather recent published spam
     recent_spam = (RevisionAkismetSubmission.objects
-                   .filter(type='spam')
-                   .order_by('-id')[:20])
+                   .filter(type='spam', revision__created__gt=start_date)
+                   .order_by('-id'))
     for rs in recent_spam:
         revision = rs.revision
         document = revision.document
@@ -384,7 +384,16 @@ def spam_dashboard_recent_events():
         idx = revision_ids.index(revision.id)
         if idx == 0:
             if document.deleted:
-                time_active = _('Deleted')
+                deletion_log_entries = (
+                    DocumentDeletionLog.objects
+                    .filter(locale=document.locale, slug=document.slug)
+                    .order_by('-pk'))
+                if deletion_log_entries.exists():
+                    entry = deletion_log_entries[0]
+                    time_active_raw = entry.timestamp - revision.created
+                    time_active = int(time_active_raw.total_seconds())
+                else:
+                    time_active = _('Deleted')
             else:
                 time_active = _('Current')
         else:
@@ -413,46 +422,7 @@ def spam_dashboard_recent_events():
             'revision_id': revision.id,
             'revision_path': revision.get_absolute_url(),
             'change_type': change_type,
-            'moderator': rs.sender.username,
             'document_path': revision.document.get_absolute_url(),
         })
 
-    # Gather recent blocked edits
-    recent_blocked = (
-        DocumentSpamAttempt.objects.order_by('-id')[:20])
-    for rb in recent_blocked:
-        # What kind of change was attempted?
-        if rb.document:
-            has_link = True
-            document_path = rb.document.get_absolute_url()
-            if rb.document.parent:
-                change_type = 'changetype_edittrans'
-            else:
-                change_type = 'changetype_edit'
-        else:
-            has_link = False
-            if rb.data:
-                rb_data = json.loads(rb.data)
-                if rb_data['blog_lang'].startswith('en'):
-                    change_type = 'changetype_new'
-                    url = rb_data['permalink']
-                    document_path = urlparse(url).path
-                else:
-                    change_type = 'changetype_newtrans'
-                    lang1, lang2 = rb_data['blog_lang'].split(',')
-                    document_path = '/%s/%s' % (lang1, rb.slug)
-            else:
-                document_path = '/' + rb.slug
-                change_type = 'unknown'
-
-        data['recent_blocked'].append({
-            'date': rb.created.date(),
-            'admin_url': reverse('admin:wiki_documentspamattempt_change',
-                                 args=(rb.id,)),
-            'change_type': change_type,
-            'moderator': rb.reviewer.username if rb.reviewer else '',
-            'review': rb.get_review_display(),
-            'has_link': has_link,
-            'document_path': document_path,
-        })
     return data

@@ -129,6 +129,8 @@ SPAM_DASHBOARD_NAMES = {
     'blocked_ham_rate': _('Blocked Ham Rate'),
     'spam_rate': _('Spam Rate'),
     'spam_blocked_rate': _('Spam Blocked Rate'),
+    'spam_viewers': _('Spam Viewers'),
+    'daily_average_viewers': _('Daily Average Viewers'),
     # Groups
     'group_staff': _('MDN Staff'),
     'group_known': _('Known Authors'),

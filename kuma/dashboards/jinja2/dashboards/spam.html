@@ -31,7 +31,8 @@
 }
 
 .spam-trends-table .period-header {
-    text-align: center;
+    text-align: right;
+    width: 7em;
 }
 
 .spam-trends-table .changetype-header {
@@ -39,16 +40,24 @@
     padding-left: 10px;
 }
 
-.spam-trends-table .date-current-header,
-.spam-trends-table .data-current,
-.spam-trends-table .rate-current,
-.spam-trends-table .trend-current {
+.spam-trends-table .date-header,
+.spam-trends-table .period-header,
+.spam-trends-table .stat-header,
+.spam-trends-table .data,
+.spam-trends-table .no-data,
+.spam-trends-table .trend {
+    padding-left: 1em;
+    padding-right: 1em;
+}
+
+.spam-trends-table .rate {
     border-left: 1px solid black;
-    padding-left: 3px;
+    padding-left: 1em;
+    padding-right: 0.5em;
 }
 
 .spam-trends-table .date-detail-header {
-    font-size: smaller;
+    text-align: right;
     padding-left: 5px;
 }
 
@@ -56,12 +65,18 @@
     vertical-align: top;
     padding-top: 3px;
     padding-bottom: 3px;
+    padding-right: 0.5em;
 }
 
 .spam-trends-table .data,
 .spam-trends-table .rate {
     text-align: right;
     font-family: monospace;
+}
+
+.spam-trends-table .no-data {
+    text-align: right;
+    font-style: italic;
 }
 
 .spam-trends-table .trend {
@@ -129,23 +144,18 @@ table.spam-events-table {
 }
 .spam-events-table col.data,
 .spam-events-table col.name {
-    width: 14%
+    width: 15%
 }
 
 .spam-events-published-spam-table col.path {
-    width: 30%
-}
-
-.spam-events-blocked-edits-table col.path {
-    width: 44%
+    width: 40%
 }
 
 </style>
 {% endblock %}
 
 
-{% set stat_ids=('spam_rate', 'spam_blocked_rate', 'blocked_ham_rate',
-                 'published_ham', 'published_spam', 'blocked_spam', 'blocked_ham', 'total') %}
+{% set stat_ids=('published_spam', 'blocked_spam', 'blocked_ham') %}
 {% block content %}
 
     <div class="dashboard">
@@ -153,157 +163,58 @@ table.spam-events-table {
         {% if processing %}
             <p>{{ _('The report is being processed. Please reload in a minute.') }}</p>
         {% else %}
-          {% if summary.total %}
-            <p>
-                {{ _('From %(start)s to %(end)s (%(weeks)s weeks):',
-                     start=summary.start, end=summary.end,
-                     weeks=summary.days // 7) }}
-            </p>
-            <div class='kpis column-container'>
-                <dl class="column-quarter">
-                    <dt>{{ ngettext('Edit', 'Edits', summary.total) }}</dt>
-                    <dd>{{ summary.total }}<dd>
-                </dl>
-                <dl class="column-quarter">
-                    <dt>{{ _('Spam') }}</dt>
-                    <dd>{{ "%0.1f%%" | format(100 * summary.spam_rate) }}</dd>
-                </dl>
-                <dl class="column-quarter">
-                    <dt>{{ _('Spam Blocked') }}</dt>
-                    <dd>{{ "%d%%" | format(100 * summary.spam_blocked_rate) }}</dd>
-                </dl>
-                <dl class="column-quarter">
-                    <dt>{{ _('False Positive Rate') }}</dt>
-                    <dd>{{ "%0.1f%%" | format(100 * summary.blocked_ham_rate) }}</dd>
-                </dl>
-            </div>
-          {% else %}
-            <p>
-                {{ _('There were no edits in the past %(count)s days.', count=summary.days) }}
-            </p>
-          {% endif %}
+            <table class='spam-trends-table'>
+                <caption>{{ _('Trends Over Time, Ending %(date)s', date=summary.end ) }} (Horizontal)</caption>
+                <thead>
+                    <tr>
+                        <th class="stat-header">Period</th>
+                        <th class="stat-header">Start</th>
+                        {% for stat in stat_ids -%}
+                        <th class="stat-header">{{ names[stat] | default(stat) }}</th>
+                        {% endfor -%}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for period in trends.over_time -%}
+                    <tr>
+                        <th scope="row" class="row-header">{{ names[period.id] | default(period.id) }}</th>
+                        <td class="row-header">{{ period.current.start }}</th>
+                        {%- for stat in stat_ids %}
+                        <td class="data">{{ period.current[stat] }}</td>
+                        {%- endfor %}
+                    </tr>
+                    {% endfor -%}
+                </tbody>
+            </table>
 
             <table class='spam-trends-table'>
-                <caption>{{ _('Trends Over Time') }}</caption>
+                <caption>{{ _('Trends Over Time, Ending %(date)s', date=summary.end ) }} (Vertical)</caption>
                 <thead>
                     <tr>
                         <th></th>
                         {% for period in trends.over_time -%}
-                        <th colspan=2 class="period-header">{{ names[period.id] | default(period.id) }}</th>
+                        <th class="period-header">{{ names[period.id] | default(period.id) }}</th>
                         {% endfor %}
-                    </tr>
-                    <tr>
-                        <th class="date-detail-header">Ending</th>
-                        {%- for period in trends.over_time -%}
-                        {%- for group in ('current', 'previous') %}
-                        <th class="date-detail-header date-{{group}}-header">{{ period[group].end }}</th>
-                        {%- endfor %}
-                        {%- endfor %}
                     </tr>
                 </thead>
                 <tbody>
+                    <tr>
+                        <th scope="row" class="row-header">{{ _('Start') }}</th>
+                        {%- for period in trends.over_time -%}
+                        <th class="date-detail-header date-header">{{ period.current.start }}</th>
+                        {%- endfor %}
+                    </tr>
                     {%- for stat in stat_ids %}
                     <tr class="row-{{stat | replace('_', '-')}} row-{{stat | replace('_', '-')}}-top">
-                        <th scope="row" rowspan=2 class="row-header">{{ names[stat] | default(stat) }}</th>
+                        <th scope="row" class="row-header">{{ names[stat] | default(stat) }}</th>
                         {%- for period in trends.over_time -%}
-                        {%- for group in ('current', 'previous') %}
-                        {%- if stat.endswith('_rate') %}
-                        <td class="rate rate-{{group}}">{{ "%0.1f%%" | format(100 * period[group][stat]) }}</td>
-                        {%- else %}
-                        <td class="data data-{{group}}">{{ period[group][stat] }}</td>
-                        {%- endif %}
-                        {%- endfor %}
-                        {%- endfor %}
-                    </tr>
-                    <tr class="row-{{stat | replace('_', '-')}} row-{{stat | replace('_', '-')}}-bottom">
-                        {%- for period in trends.over_time -%}
-                        {%- set diff = period['current'][stat] - period['previous'][stat] %}
-                        {%- if period['previous'][stat] > 0 %}
-                        {%- set increase = diff / period['previous'][stat] %}
-                        {%- else %}
-                        {%- set increase = 1 %}
-                        {%- endif %}
-                        {%- if diff == 0 %}
-                        <td class="trend trend-current">0%</td>
-                        {%- elif diff > 0 %}
-                        <td class="trend trend-current increase">{{ "%d%%" | format(100 * increase) }}</td>
-                        {%- else %}
-                        <td class="trend trend-current decrease">{{ "%d%%" | format(-100 * increase) }}</td>
-                        {%- endif %}
-                        <td class="trend trend-previous"></td>
+                        <td class="data">{{ period['current'][stat] }}</td>
                         {%- endfor %}
                     </tr>
                     {%- endfor %}
                 </tbody>
             </table>
 
-            <table class='spam-trends-table'>
-                <caption>{{ _('Trends by Edit Type') }}</caption>
-                <thead>
-                    <tr>
-                        <th></th>
-                        {% for change_type in change_types %}
-                        <th class="changetype-header">{{ names[change_type.id] | default(change_type.id) }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {%- for stat in stat_ids %}
-                    <tr class="row-{{stat | replace('_', '-')}} row-{{stat | replace('_', '-')}}-top row-{{stat | replace('_', '-')}}-bottom">
-                        <th scope="row" class="row-header">{{ names[stat] | default(stat) }}</th>
-                        {%- for change_type in change_types %}
-                        {%- if stat.endswith('_rate') %}
-                        {%- set stat_id = stat.replace('_rate', '_' + change_type.id + '_rate') %}
-                        <td class="rate">{{ "%0.1f%%" | format(100 * summary[stat_id]) }}</td>
-                        {%- else %}
-                        {%- set stat_id = stat + '_' + change_type.id %}
-                        <td class="data">{{ summary[stat_id] }}</td>
-                        {%- endif %}
-                        {%- endfor %}
-                    </tr>
-                    {%- endfor %}
-                </tbody>
-            </table>
-
-            <table class='spam-trends-table'>
-                <caption>{{ _('Trends by User Group') }}</caption>
-                <thead>
-                    <tr>
-                        <th></th>
-                        {% for group in categories.group %}
-                        <th class="changetype-header">{{ names['group_' + group] | default(group) }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {%- for stat in stat_ids %}
-                    <tr class="row-{{stat | replace('_', '-')}} row-{{stat | replace('_', '-')}}-top row-{{stat | replace('_', '-')}}-bottom">
-                        <th scope="row" class="row-header">{{ names[stat] | default(stat) }}</th>
-                        {%- for group in categories.group %}
-                        {%- if stat.endswith('_rate') %}
-                        {%- set stat_id = stat.replace('_rate', '_group_' + group + '_rate') %}
-                        <td class="rate">{{ "%0.1f%%" | format(100 * summary[stat_id]) }}</td>
-                        {%- else %}
-                        {%- set stat_id = stat + '_group_' + group %}
-                        <td class="data">{{ summary[stat_id] }}</td>
-                        {%- endif %}
-                        {%- endfor %}
-                    </tr>
-                    {%- endfor %}
-                    {%- for change_type in change_types %}
-                    {%- set stat = change_type.id %}
-                    <tr class="row-{{stat | replace('_', '-')}} row-{{stat | replace('_', '-')}}-top row-{{stat | replace('_', '-')}}-bottom">
-                        <th scope="row" class="row-header">{{ names[stat] | default(stat) }}</th>
-                        {%- for group in categories.group %}
-                        {%- set stat_id = group + '_' + stat %}
-                        <td class="data">{{ summary[stat_id] }}</td>
-                        {%- endfor %}
-                    </tr>
-                    {%- endfor %}
-                </tbody>
-            </table>
-
-        <h2>{{ _('Recent Events') }}</h2>
           {% if recent_spam %}
             <table class="spam-events-table spam-events-published-spam-table">
                 <caption>{{ _('Published Spam') }}</caption>
@@ -311,7 +222,6 @@ table.spam-events-table {
                     <col span="1" class="data">
                     <col span="1" class="data">
                     <col span="1" class="data">
-                    <col span="1" class="name">
                     <col span="1" class="name">
                     <col span="1" class="path">
                 </colgroup>
@@ -321,7 +231,6 @@ table.spam-events-table {
                         <th class="data">{{ _('Time Active (seconds)') }}</th>
                         <th class="data">{{ _('Revision') }}</th>
                         <th class="name">{{ _('Change Type') }}</th>
-                        <th class="name">{{ _('Moderator') }}</th>
                         <th class="path">{{ _('Path') }}</th>
                     </tr>
                 </thead>
@@ -332,7 +241,6 @@ table.spam-events-table {
                         <td class="data">{{ rs.time_active }}</td>
                         <td class="data"><a href="{{ rs.revision_path }}">{{ rs.revision_id }}</a></td>
                         <td class="name">{{ names[rs.change_type] | default(rs.change_type) }}</td>
-                        <td class="name">{{ rs.moderator }}</td>
                         <td class="path"><a href="{{ rs.document_path }}">{{ rs.document_path }}</a></td>
                     </tr>
                     {% endfor -%}
@@ -341,48 +249,7 @@ table.spam-events-table {
           {% else %}
             <p>{{ _('No recent published spam.') }}</p>
           {% endif %}
-
-          {% if recent_blocked %}
-            <table class="spam-events-table spam-events-blocked-edits-table">
-                <caption>{{ _('Blocked Edits') }}</caption>
-                <colgroup>
-                    <col span="1" class="data">
-                    <col span="1" class="name">
-                    <col span="1" class="name">
-                    <col span="1" class="name">
-                    <col span="1" class="path">
-                </colgroup>
-                <thead>
-                    <tr>
-                        <th class="data">{{ _('Date') }}</th>
-                        <th class="name">{{ _('Change Type') }}</th>
-                        <th class="name">{{ _('Moderator') }}</th>
-                        <th class="name">{{ _('Review') }}</th>
-                        <th class="path">{{ _('Path') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for rb in recent_blocked -%}
-                    <tr>
-                        <td class="data">{{ rb.date }}</td>
-                        <td class="name">{{ names[rb.change_type] | default(rb.change_type) }}</td>
-                        <td class="name">{{ rb.moderator }}</td>
-                        <td class="name"><a href="{{ rb.admin_url }}">{{ rb.review }}</a></td>
-                        <td class="path">
-                            {%- if rb.has_link -%}
-                                <a href="{{ rb.document_path }}">{{ rb.document_path }}</a>
-                            {%- else -%}
-                                {{ rb.document_path }}
-                            {%- endif -%}
-                        </td>
-                    </tr>
-                    {% endfor -%}
-                </tbody>
-            </table>
-          {% else %}
-            <p>{{ _('No recent blocked edits.') }}</p>
-          {% endif %}
-        {% endif %}
+        {% endif %}{# processing #}
     </div>
     {% if not processing %}
     <ul>
