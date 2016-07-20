@@ -15,69 +15,48 @@ from kuma.core.utils import urlparams
 from kuma.wiki.models import RevisionAkismetSubmission, DocumentDeletionLog, Document
 from kuma.wiki.tests import document as create_document, revision as create_revision
 
-from . import SampleRevisionsMixin, UserTestCase
+from . import SampleRevisionsMixin, SocialTestMixin, UserTestCase
 from .test_views import TESTUSER_PASSWORD
 from ..models import UserBan
 
 
-def add_persona_verify_response(mock_requests, data):
-    mock_requests.post(
-        settings.PERSONA_VERIFIER_URL,
-        json=data,
-        headers={
-            'content_type': 'application/json',
-        }
-    )
-
-
 @requests_mock.mock()
-class SignupTests(UserTestCase):
+class SignupTests(UserTestCase, SocialTestMixin):
     localizing_client = False
+    profile_create_strings = (
+        'Create your MDN profile to continue',
+        'choose a username',
+        'having trouble',
+        'I agree',
+        'to Mozilla',
+        'Terms',
+        'Privacy Notice')
 
-    def test_signup_page(self, mock_requests):
-        add_persona_verify_response(mock_requests, {
-            'status': 'okay',
-            'email': 'newuser@test.com',
-            'audience': 'https://developer-local.allizom.org',
-        })
-
-        url = reverse('persona_login')
-        response = self.client.post(url, follow=True)
-
+    def test_signup_page_persona(self, mock_requests):
+        response = self.persona_login(mock_requests)
         self.assertNotContains(response, 'Sign In Failure')
-        test_strings = ['Create your MDN profile to continue',
-                        'choose a username',
-                        'having trouble',
-                        'I agree',
-                        'to Mozilla',
-                        'Terms',
-                        'Privacy Notice']
-        for test_string in test_strings:
+        for test_string in self.profile_create_strings:
+            self.assertContains(response, test_string)
+
+    def test_signup_page_github(self, mock_requests):
+        response = self.github_login(mock_requests)
+        self.assertNotContains(response, 'Sign In Failure')
+        for test_string in self.profile_create_strings:
             self.assertContains(response, test_string)
 
     def test_signup_page_disabled(self, mock_requests):
-        add_persona_verify_response(mock_requests, {
-            'status': 'okay',
-            'email': 'newuser@test.com',
-            'audience': 'https://developer-local.allizom.org',
-        })
-
-        url = reverse('persona_login')
-
         registration_disabled = Flag.objects.create(
             name='registration_disabled',
             everyone=True
         )
-        response = self.client.post(url, follow=True)
-
+        response = self.persona_login(mock_requests)
         self.assertNotContains(response, 'Sign In Failure')
         self.assertContains(response, 'Profile Creation Disabled')
 
         # re-enable registration
         registration_disabled.everyone = False
         registration_disabled.save()
-
-        response = self.client.post(url, follow=True)
+        response = self.persona_login(mock_requests)
         test_strings = ['Create your MDN profile to continue',
                         'choose a username',
                         'having trouble']
@@ -138,7 +117,7 @@ class SocialAccountConnectionsTests(UserTestCase):
             self.assertContains(response, test_string)
 
 
-class AllauthPersonaTestCase(UserTestCase):
+class AllauthPersonaTestCase(UserTestCase, SocialTestMixin):
     existing_persona_email = 'testuser@test.com'
     existing_persona_username = 'testuser'
     localizing_client = False
@@ -150,11 +129,11 @@ class AllauthPersonaTestCase(UserTestCase):
         failure copy, and does not contain success messages or a form
         to choose a username.
         """
-        add_persona_verify_response(mock_requests, {
+        data = {
             'status': 'failure',
             'reason': 'this email address has been naughty'
-        })
-        response = self.client.post(reverse('persona_login'), follow=True)
+        }
+        response = self.persona_login(mock_requests, verifier_data=data)
         for expected_string in ('Account Sign In Failure',
                                 'An error occurred while attempting to sign '
                                 'in with your account.'):
@@ -178,14 +157,8 @@ class AllauthPersonaTestCase(UserTestCase):
         message and the Persona-specific signup form, correctly
         populated, and does not display the failure copy.
         """
-        persona_signup_email = 'templates_persona_auth_copy@example.com'
-        add_persona_verify_response(mock_requests, {
-            'status': 'okay',
-            'email': persona_signup_email,
-        })
-
-        response = self.client.post(reverse('persona_login'),
-                                    follow=True)
+        persona_signup_email = self.persona_verifier_data['email']
+        response = self.persona_login(mock_requests)
         for expected_string in (
             # Test that we got:
             #
@@ -221,12 +194,9 @@ class AllauthPersonaTestCase(UserTestCase):
         to log in, and a logout link appear in the auth tools section
         of the page.
         """
-        add_persona_verify_response(mock_requests, {
-            'status': 'okay',
-            'email': self.existing_persona_email,
-        })
-
-        response = self.client.post(reverse('persona_login'), follow=True)
+        data = self.persona_verifier_data.copy()
+        data['email'] = self.existing_persona_email
+        response = self.persona_login(mock_requests, verifier_data=data)
         eq_(response.status_code, 200)
 
         user_url = reverse(
@@ -300,14 +270,10 @@ class AllauthPersonaTestCase(UserTestCase):
         indication that Persona was used to log in, and a logout link
         appear in the auth tools section of the page.
         """
-        persona_signup_email = 'templates_persona_signup_copy@example.com'
+        persona_signup_email = self.persona_verifier_data['email']
         persona_signup_username = 'templates_persona_signup_copy'
-        add_persona_verify_response(mock_requests, {
-            'status': 'okay',
-            'email': persona_signup_email,
-        })
+        self.persona_login(mock_requests)
 
-        self.client.post(reverse('persona_login'), follow=True)
         data = {'website': '',
                 'username': persona_signup_username,
                 'email': persona_signup_email,

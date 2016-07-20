@@ -1,9 +1,17 @@
-from django.contrib.auth import get_user_model
-from django.utils.crypto import get_random_string
 from allauth.account.models import EmailAddress
+from allauth.socialaccount.providers import registry
+from allauth.socialaccount.providers.github.views import GitHubOAuth2Adapter
+from allauth.socialaccount.models import SocialApp
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.sites.models import Site
+from django.utils.crypto import get_random_string
+
 
 from kuma.core.tests import KumaTestCase, KumaTransactionTestCase
+from kuma.core.urlresolvers import reverse
 from kuma.wiki.tests import revision as create_revision, document as create_document
+from ..providers.github.provider import KumaGitHubProvider
 
 
 class UserTestMixin(object):
@@ -82,3 +90,130 @@ class SampleRevisionsMixin(object):
                 save=True)
             revisions_created.append(new_revision)
         return revisions_created
+
+
+class SocialTestMixin(object):
+
+    persona_verifier_data = {
+        'status': 'okay',
+        'email': 'new_persona_user@example.com',
+        'audience': 'https://developer-local.allizom.org',
+    }
+
+    def persona_login(self, mock_requests, verifier_data=None, next_url=None):
+        """
+        Mock a login to Persona and return the response.
+
+        Keyword Arguments:
+        mock_requests - a requests_mock mock
+        verifier_data - Persona data, or None for default
+        """
+        mock_requests.post(
+            settings.PERSONA_VERIFIER_URL,
+            json=verifier_data or self.persona_verifier_data,
+            headers={'content_type': 'application/json'}
+        )
+        url = reverse('persona_login', locale=settings.WIKI_DEFAULT_LANGUAGE)
+        if next_url:
+            post_data = {'next': next_url}
+        else:
+            post_data = None
+        response = self.client.post(url, follow=True, data=post_data)
+        return response
+
+    github_token_data = {
+        'uid': 1,
+        'access_token': 'github_token',
+    }
+    github_profile_data = {
+        'login': 'octocat',
+        'id': 1,
+        'email': 'octocat@example.com',
+        # Unused profile items
+        'avatar_url': 'https://github.com/images/error/octocat_happy.gif',
+        'gravatar_id': 'somehexcode',
+        'url': 'https://api.github.com/users/octocat',
+        'html_url': 'https://github.com/octocat',
+        'followers_url': 'https://api.github.com/users/octocat/followers',
+        'following_url': 'https://api.github.com/users/octocat/following{/other_user}',
+        'gists_url': 'https://api.github.com/users/octocat/gists{/gist_id}',
+        'starred_url': 'https://api.github.com/users/octocat/starred{/owner}{/repo}',
+        'subscriptions_url': 'https://api.github.com/users/octocat/subscriptions',
+        'organizations_url': 'https://api.github.com/users/octocat/orgs',
+        'repos_url': 'https://api.github.com/users/octocat/repos',
+        'events_url': 'https://api.github.com/users/octocat/events{/privacy}',
+        'received_events_url': 'https://api.github.com/users/octocat/received_events',
+        'type': 'User',
+        'site_admin': False,
+        'name': 'monalisa octocat',
+        'company': 'GitHub',
+        'blog': 'https://github.com/blog',
+        'location': 'San Francisco',
+        'hireable': False,
+        'public_repos': 2,
+        'public_gists': 1,
+        'followers': 20,
+        'following': 0,
+        'created_at': '2008-01-14T04:33:35Z',
+        'updated_at': '2008-01-14T04:33:35Z'
+    }
+    github_email_data = [
+        {
+            'email': 'octocat-private@example.com',
+            'verified': True,
+            'primary': True
+        }
+    ]
+
+    def github_login(
+            self, mock_requests,
+            token_data=None, profile_data=None, email_data=None,
+            process='login'):
+        """
+        Mock a login to GitHub and return the response.
+
+        Keyword Arguments:
+        token_data - OAuth token data, or None for default
+        profile_data - GitHub profile data, or None for default
+        email_data - GitHub email data, or None for default
+        process - 'login', 'connect', or 'redirect'
+        """
+        self.ensure_github_app()
+        mock_requests.post(
+            GitHubOAuth2Adapter.access_token_url,
+            json=token_data or self.github_token_data,
+            headers={'content-type': 'application/json'})
+        mock_requests.get(
+            GitHubOAuth2Adapter.profile_url,
+            json=profile_data or self.github_profile_data)
+        mock_requests.get(
+            GitHubOAuth2Adapter.emails_url,
+            json=self.github_email_data if email_data is None else email_data)
+
+        data = {'process': process}
+        state = 'github_state'
+        self.set_github_oauth2_state(data, state)
+
+        url = reverse('github_callback', locale=settings.WIKI_DEFAULT_LANGUAGE)
+        data = {'code': 'github_code', 'state': state}
+        response = self.client.get(url, data, follow=True)
+        return response
+
+    def ensure_github_app(self):
+        """Ensure a GitHub SocialApp is installed, configured."""
+        provider = registry.by_id(KumaGitHubProvider.id)
+        app, created = SocialApp.objects.get_or_create(
+            provider=provider.id,
+            defaults={
+                'name': provider.id,
+                'client_id': 'app123id',
+                'key': provider.id,
+                'secret': 'dummy'})
+        if created:
+            app.sites.add(Site.objects.get_current())
+        return app
+
+    def set_github_oauth2_state(self, data, state):
+        session = self.client.session
+        session['socialaccount_state'] = (data, state)
+        session.save()
