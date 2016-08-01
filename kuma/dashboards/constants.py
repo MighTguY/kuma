@@ -58,6 +58,10 @@ BASE_SPAM_DASHBOARD_DERIVED_STATS = [
         'derived': {'content': 'ham', 'published': 'blocked'},
         'rate_denominiator': 'total',
     }, {
+        'id': 'ham',
+        'derived': {'content': 'ham'},
+        'rate_denominiator': 'total',
+    }, {
         'id': 'spam',
         'derived': {'content': 'spam'},
         'rate_denominiator': 'total',
@@ -65,6 +69,16 @@ BASE_SPAM_DASHBOARD_DERIVED_STATS = [
         'id': 'spam_blocked',
         'derived': {'content': 'spam', 'published': 'blocked'},
         'rate_denominiator': 'spam',
+    }, {
+        'id': 'true_positive',
+        'derived': {'content': 'spam', 'published': 'blocked'},
+        'rate_denominiator': 'spam',
+        'rate_if_zero_denominator': 1.0,
+    }, {
+        'id': 'true_negative',
+        'derived': {'content': 'ham', 'published': 'published'},
+        'rate_denominiator': 'ham',
+        'rate_if_zero_denominator': 1.0,
     }
 ]
 SPAM_DASHBOARD_DERIVED_STATS = BASE_SPAM_DASHBOARD_DERIVED_STATS[:]
@@ -82,6 +96,10 @@ for changetype in SPAM_STAT_CHANGE_TYPES:
         denom_id = stat.get('rate_denominiator')
         if denom_id:
             ct_stat['rate_denominiator'] = denom_id + '_' + changetype['id']
+            zero_value = stat.get('rate_if_zero_denominator')
+            if zero_value is not None:
+                ct_stat['rate_if_zero_denominator'] = zero_value
+
         SPAM_DASHBOARD_DERIVED_STATS.append(ct_stat)
 
 # Add base statistics segemented by user group
@@ -96,6 +114,9 @@ for group in dict(SPAM_STAT_CATEGORY_OPTIONS)['group']:
         denom_id = stat.get('rate_denominiator')
         if denom_id:
             g_stat['rate_denominiator'] = denom_id + '_group_' + group
+            zero_value = stat.get('rate_if_zero_denominator')
+            if zero_value is not None:
+                g_stat['rate_if_zero_denominator'] = zero_value
         SPAM_DASHBOARD_DERIVED_STATS.append(g_stat)
 
 # Add change type segmented by user group
@@ -130,7 +151,10 @@ SPAM_DASHBOARD_NAMES = {
     'spam_rate': _('Spam Rate'),
     'spam_blocked_rate': _('Spam Blocked Rate'),
     'spam_viewers': _('Spam Viewers'),
-    'daily_average_viewers': _('Daily Average Viewers'),
+    'spam_viewers_change': _('% Change'),
+    'spam_viewers_daily_average': _('Daily Average Viewers'),
+    'true_positive_rate': _('True Positive Rate'),
+    'true_negative_rate': _('True Negative Rate'),
     # Groups
     'group_staff': _('MDN Staff'),
     'group_known': _('Known Authors'),

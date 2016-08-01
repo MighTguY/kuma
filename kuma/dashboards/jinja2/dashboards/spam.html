@@ -51,7 +51,6 @@
 }
 
 .spam-trends-table .rate {
-    border-left: 1px solid black;
     padding-left: 1em;
     padding-right: 0.5em;
 }
@@ -144,7 +143,8 @@ table.spam-events-table {
 }
 .spam-events-table col.data,
 .spam-events-table col.name {
-    width: 15%
+    /* 100% - (path %) / 5 columns */
+    width: 12%
 }
 
 .spam-events-published-spam-table col.path {
@@ -155,7 +155,15 @@ table.spam-events-table {
 {% endblock %}
 
 
-{% set stat_ids=('published_spam', 'blocked_spam', 'blocked_ham') %}
+{% set stat_ids=('spam_viewers_change', 'spam_viewers',
+                 'spam_viewers_daily_average',
+                 'published_spam', 'blocked_spam', 'blocked_ham',
+                 'true_positive_rate', 'true_negative_rate') %}
+{% set fake_stats={
+    'spam_viewers_change': ('rate', '0.0%'),
+    'spam_viewers': ('data', '0'),
+    'spam_viewers_daily_average': ('data', 0),
+} %}
 {% block content %}
 
     <div class="dashboard">
@@ -180,7 +188,13 @@ table.spam-events-table {
                         <th scope="row" class="row-header">{{ names[period.id] | default(period.id) }}</th>
                         <td class="row-header">{{ period.current.start }}</th>
                         {%- for stat in stat_ids %}
+                        {%- if stat in fake_stats %}
+                        <td class="{{ fake_stats[stat][0] }}">{{ fake_stats[stat][1] }}</td>
+                        {%- elif stat.endswith('_rate') %}
+                        <td class="rate">{{ "%0.1f%%" | format(100 * period.current[stat]) }}</td>
+                        {%- else %}
                         <td class="data">{{ period.current[stat] }}</td>
+                        {%- endif %}
                         {%- endfor %}
                     </tr>
                     {% endfor -%}
@@ -208,7 +222,13 @@ table.spam-events-table {
                     <tr class="row-{{stat | replace('_', '-')}} row-{{stat | replace('_', '-')}}-top">
                         <th scope="row" class="row-header">{{ names[stat] | default(stat) }}</th>
                         {%- for period in trends.over_time -%}
+                        {% if stat in fake_stats %}
+                        <td class="{{ fake_stats[stat][0] }}">{{ fake_stats[stat][1] }}</td>
+                        {%- elif stat.endswith('_rate') %}
+                        <td class="rate">{{ "%0.1f%%" | format(100 * period.current[stat]) }}</td>
+                        {%- else %}
                         <td class="data">{{ period['current'][stat] }}</td>
+                        {%- endif %}
                         {%- endfor %}
                     </tr>
                     {%- endfor %}
@@ -222,6 +242,7 @@ table.spam-events-table {
                     <col span="1" class="data">
                     <col span="1" class="data">
                     <col span="1" class="data">
+                    <col span="1" class="data">
                     <col span="1" class="name">
                     <col span="1" class="path">
                 </colgroup>
@@ -229,6 +250,7 @@ table.spam-events-table {
                     <tr>
                         <th class="data">{{ _('Date') }}</th>
                         <th class="data">{{ _('Time Active (seconds)') }}</th>
+                        <th class="data">{{ _('Estimated Viewers') }}</th>
                         <th class="data">{{ _('Revision') }}</th>
                         <th class="name">{{ _('Change Type') }}</th>
                         <th class="path">{{ _('Path') }}</th>
@@ -239,6 +261,7 @@ table.spam-events-table {
                     <tr>
                         <td class="data">{{ rs.date }}</td>
                         <td class="data">{{ rs.time_active }}</td>
+                        <td class="data">0</td>
                         <td class="data"><a href="{{ rs.revision_path }}">{{ rs.revision_id }}</a></td>
                         <td class="name">{{ names[rs.change_type] | default(rs.change_type) }}</td>
                         <td class="path"><a href="{{ rs.document_path }}">{{ rs.document_path }}</a></td>

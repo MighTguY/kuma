@@ -272,7 +272,7 @@ def spam_dashboard_historical_stats(
                 if denom:
                     rate = float(derived) / float(denom)
                 else:
-                    rate = 0.0
+                    rate = stat_def.get('rate_if_zero_denominator', 0.0)
                 day_events[stat_def['id'] + SPAM_RATE_ID_SUFFIX] = rate
 
         # Store raw and derived statistics for the day
@@ -332,7 +332,7 @@ def spam_dashboard_historical_stats(
                     if denom:
                         rate = float(derived) / float(denom)
                     else:
-                        rate = 0.0
+                        rate = stat_def.get('rate_if_zero_denominator', 0.0)
                     gdict[stat_def['id'] + SPAM_RATE_ID_SUFFIX] = rate
         if length == summary:
             summary_period = period_data
